@@ -114,7 +114,7 @@ Both users share all data — there is no per-user data separation.
 Open `index.html` and replace the two placeholder values near the top of the `<script>` block:
 
 ```javascript
-const SUPABASE_URL = 'YOUR_SUPABASE_URL';   // e.g. https://abcxyz.supabase.co
+const SUPABASE_URL = 'YOUR_SUPABASE_URL';   // e.g. https://aovmbeqmdrjommnydaue.supabase.co
 const SUPABASE_KEY = 'YOUR_SUPABASE_KEY';   // your anon/public key
 ```
 
