@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Home Manager</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <style>
+    :root {
+      --bg: #f3f4f6;
+      --card: #ffffff;
+      --border: #e5e7eb;
+      --text: #111827;
+      --muted: #6b7280;
+      --primary: #2563eb;
+      --primary-h: #1d4ed8;
+      --danger: #dc2626;
+      --danger-h: #b91c1c;
+      --danger-bg: #fee2e2;
+      --danger-bdr: #fca5a5;
+      --warn-bg: #fefce8;
+      --warn-bdr: #fcd34d;
+      --warn-text: #92400e;
+      --nav: #1e3a5f;
+      --nav-t: #e2e8f0;
+      --r: 8px;
+      --sh: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); font-size: 15px; line-height: 1.5; }
+
+    /* ── Login ── */
+    #login-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+    .login-box { background: var(--card); border-radius: var(--r); padding: 2rem; width: 100%; max-width: 380px; box-shadow: 0 4px 20px rgba(0,0,0,0.12); }
+    .login-box h1 { font-size: 1.4rem; margin-bottom: 0.25rem; }
+    .login-box p { color: var(--muted); margin-bottom: 1.5rem; font-size: 0.875rem; }
+
+    /* ── App shell ── */
+    #app { display: none; }
+    header { background: var(--nav); color: var(--nav-t); padding: 0 1rem; display: flex; align-items: center; gap: 0.75rem; height: 54px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+    header h1 { font-size: 1rem; font-weight: 700; flex: 1; white-space: nowrap; }
+    nav { display: flex; gap: 0.2rem; }
+    nav button { background: none; border: none; color: var(--nav-t); padding: 0.4rem 0.65rem; border-radius: var(--r); cursor: pointer; font-size: 0.8rem; font-family: inherit; opacity: 0.7; transition: opacity 0.15s, background 0.15s; }
+    nav button:hover { opacity: 1; background: rgba(255,255,255,0.12); }
+    nav button.active { opacity: 1; background: rgba(255,255,255,0.2); font-weight: 700; }
+    #btn-logout { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.25); color: var(--nav-t); padding: 0.3rem 0.65rem; border-radius: var(--r); cursor: pointer; font-size: 0.8rem; font-family: inherit; white-space: nowrap; }
+    #btn-logout:hover { background: rgba(255,255,255,0.22); }
+    main { padding: 1rem; max-width: 880px; margin: 0 auto; }
+
+    /* ── Forms ── */
+    .fg { margin-bottom: 0.9rem; }
+    .fg label { display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 0.3rem; color: var(--text); }
+    .fg.req label::after { content: ' *'; color: var(--danger); }
+    .fg input, .fg select, .fg textarea {
+      width: 100%; padding: 0.45rem 0.7rem; border: 1px solid var(--border);
+      border-radius: var(--r); font-size: 0.875rem; font-family: inherit;
+      background: var(--card); color: var(--text); transition: border-color 0.15s;
+    }
+    .fg input:focus, .fg select:focus, .fg textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,0.12); }
+    .fg textarea { resize: vertical; min-height: 72px; }
+    .fgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
+    @media (max-width: 460px) { .fgrid { grid-template-columns: 1fr; } }
+
+    /* ── Buttons ── */
+    .btn { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.45rem 0.9rem; border-radius: var(--r); border: none; font-size: 0.875rem; font-family: inherit; font-weight: 600; cursor: pointer; transition: background 0.15s; white-space: nowrap; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-h); }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-danger:hover { background: var(--danger-h); }
+    .btn-ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
+    .btn-ghost:hover { background: var(--bg); }
+    .btn-sm { padding: 0.3rem 0.65rem; font-size: 0.8rem; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ── Cards & layout ── */
+    .card { background: var(--card); border-radius: var(--r); border: 1px solid var(--border); box-shadow: var(--sh); padding: 1rem; }
+    .sh { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; }
+    .sh h2 { font-size: 1rem; font-weight: 700; }
+    .divider { border: none; border-top: 1px solid var(--border); margin: 1.25rem 0; }
+    .empty { text-align: center; padding: 2rem 1rem; color: var(--muted); font-size: 0.875rem; }
+
+    /* ── Alert items (dashboard) ── */
+    .alert { padding: 0.75rem; border-radius: var(--r); margin-bottom: 0.5rem; border: 1px solid transparent; cursor: pointer; transition: filter 0.15s; }
+    .alert:hover { filter: brightness(0.97); }
+    .alert.overdue { background: var(--danger-bg); border-color: var(--danger-bdr); }
+    .alert.due-soon { background: var(--warn-bg); border-color: var(--warn-bdr); }
+    .alert.eol-past { background: var(--danger-bg); border-color: var(--danger-bdr); }
+    .alert.eol-near { background: var(--warn-bg); border-color: var(--warn-bdr); }
+    .alert-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; }
+    .alert h3 { font-size: 0.875rem; font-weight: 700; }
+    .alert p { font-size: 0.78rem; color: var(--muted); margin-top: 0.15rem; }
+
+    /* ── Badges ── */
+    .badge { display: inline-block; padding: 0.18rem 0.5rem; border-radius: 9999px; font-size: 0.72rem; font-weight: 700; border: 1px solid transparent; white-space: nowrap; }
+    .badge-overdue { background: var(--danger-bg); color: var(--danger); border-color: var(--danger-bdr); }
+    .badge-soon { background: var(--warn-bg); color: var(--warn-text); border-color: var(--warn-bdr); }
+
+    /* ── Inventory list ── */
+    .cat-label { font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 0.4rem; padding-bottom: 0.25rem; border-bottom: 1px solid var(--border); }
+    .cat-group { margin-bottom: 1.25rem; }
+    .inv-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.7rem 0.85rem; background: var(--card); border: 1px solid var(--border); border-left-width: 4px; border-left-color: var(--border); border-radius: var(--r); margin-bottom: 0.4rem; cursor: pointer; transition: box-shadow 0.15s; }
+    .inv-row:hover { box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    .inv-row.overdue { border-left-color: var(--danger); }
+    .inv-row.due-soon { border-left-color: var(--warn-bdr); }
+    .inv-name { font-weight: 700; font-size: 0.875rem; }
+    .inv-meta { font-size: 0.78rem; color: var(--muted); margin-top: 0.1rem; }
+    .inv-right { text-align: right; flex-shrink: 0; }
+    .inv-right .inv-meta { margin-top: 0; }
+
+    /* ── Log list ── */
+    .log-row { padding: 0.7rem 0.85rem; background: var(--card); border: 1px solid var(--border); border-radius: var(--r); margin-bottom: 0.4rem; cursor: pointer; transition: box-shadow 0.15s; }
+    .log-row:hover { box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    .log-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; }
+    .log-date { font-size: 0.78rem; font-weight: 700; color: var(--primary); }
+    .log-cost { font-size: 0.85rem; font-weight: 700; }
+    .log-desc { font-size: 0.875rem; font-weight: 700; margin-top: 0.15rem; }
+    .log-meta { font-size: 0.78rem; color: var(--muted); margin-top: 0.1rem; }
+
+    /* ── Detail view ── */
+    .detail-header { display: flex; align-items: center; gap: 0.65rem; margin-bottom: 1rem; flex-wrap: wrap; }
+    .detail-header h2 { font-size: 1.1rem; font-weight: 700; flex: 1; }
+    .detail-meta { font-size: 0.8rem; color: var(--muted); margin-top: 0.3rem; }
+
+    /* ── Modal ── */
+    #modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 500; overflow-y: auto; padding: 1rem; align-items: flex-start; justify-content: center; padding-top: 3rem; }
+    #modal-overlay.open { display: flex; }
+    #modal-box { background: var(--card); border-radius: var(--r); width: 100%; max-width: 560px; box-shadow: 0 20px 60px rgba(0,0,0,0.25); }
+    .modal-head { display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); }
+    .modal-head h2 { font-size: 1rem; font-weight: 700; }
+    .modal-close { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--muted); line-height: 1; padding: 0.1rem 0.25rem; }
+    .modal-close:hover { color: var(--text); }
+    .modal-body { padding: 1.25rem; max-height: 70vh; overflow-y: auto; }
+    .modal-foot { display: flex; gap: 0.5rem; justify-content: flex-end; padding: 1rem 1.25rem; border-top: 1px solid var(--border); flex-wrap: wrap; }
+
+    /* ── Toast ── */
+    #toast { position: fixed; bottom: 1.25rem; left: 50%; transform: translateX(-50%); background: #1e293b; color: #fff; padding: 0.65rem 1.1rem; border-radius: var(--r); font-size: 0.875rem; z-index: 9999; opacity: 0; pointer-events: none; transition: opacity 0.2s; white-space: nowrap; }
+    #toast.show { opacity: 1; }
+
+    /* ── Error/Info ── */
+    .err-msg { font-size: 0.8rem; color: var(--danger); margin-top: 0.25rem; }
+    .filter-bar { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.9rem; flex-wrap: wrap; }
+    .filter-bar label { font-size: 0.8rem; font-weight: 600; }
+    .filter-bar select { padding: 0.35rem 0.6rem; border: 1px solid var(--border); border-radius: var(--r); font-size: 0.875rem; background: var(--card); }
+  </style>
+</head>
+<body>
+
+<!-- Login Screen -->
+<div id="login-screen">
+  <div class="login-box">
+    <h1>&#127968; Home Manager</h1>
+    <p>Sign in to manage your home inventory and maintenance records.</p>
+    <div class="fg req">
+      <label for="le">Email</label>
+      <input type="email" id="le" placeholder="you@example.com" autocomplete="email">
+    </div>
+    <div class="fg req">
+      <label for="lp">Password</label>
+      <input type="password" id="lp" autocomplete="current-password">
+    </div>
+    <div id="lerr" style="color:var(--danger);font-size:0.85rem;margin-bottom:0.75rem;display:none"></div>
+    <button class="btn btn-primary" id="btn-login" style="width:100%">Sign In</button>
+  </div>
+</div>
+
+<!-- Main App -->
+<div id="app">
+  <header>
+    <h1>&#127968; Home Manager</h1>
+    <nav>
+      <button class="active" data-view="dashboard">Dashboard</button>
+      <button data-view="inventory">Inventory</button>
+      <button data-view="log">Log</button>
+    </nav>
+    <button id="btn-logout">Sign Out</button>
+  </header>
+  <main>
+    <div id="view-dashboard"></div>
+    <div id="view-inventory" style="display:none"></div>
+    <div id="view-log" style="display:none"></div>
+  </main>
+</div>
+
+<!-- Modal -->
+<div id="modal-overlay">
+  <div id="modal-box">
+    <div class="modal-head">
+      <h2 id="modal-title"></h2>
+      <button class="modal-close" id="modal-close" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-foot" id="modal-foot"></div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+// ── CONFIG ───────────────────────────────────────────────────────────────────
+// Replace these two values with your Supabase project credentials before deploying.
+const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+const SUPABASE_KEY = 'YOUR_SUPABASE_KEY';
+
+// ── CLIENT ───────────────────────────────────────────────────────────────────
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ── STATE ────────────────────────────────────────────────────────────────────
+const S = {
+  view: 'dashboard',      // 'dashboard' | 'inventory' | 'log'
+  invView: 'list',        // 'list' | 'detail'
+  selItem: null,          // selected inventory item for detail view
+  logFilter: null,        // inventory_id filter for log view
+  inventory: [],
+  log: [],
+  user: null,
+};
+
+// ── UTILS ────────────────────────────────────────────────────────────────────
+function esc(s) {
+  if (s == null) return '';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function today() {
+  return new Date().toISOString().split('T')[0];
+}
+
+function fmtDate(iso) {
+  if (!iso) return '—';
+  const [y, m] = iso.split('-');
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return months[parseInt(m, 10) - 1] + ' ' + y;
+}
+
+function fmtDateLong(iso) {
+  if (!iso) return '—';
+  const [y, m, d] = iso.split('-');
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return months[parseInt(m, 10) - 1] + ' ' + parseInt(d, 10) + ', ' + y;
+}
+
+function fmtMoney(val) {
+  if (val == null || val === '') return '—';
+  return '$' + Number(val).toFixed(2);
+}
+
+function addMonths(isoDate, months) {
+  if (!isoDate || !months) return null;
+  const d = new Date(isoDate + 'T12:00:00');
+  d.setMonth(d.getMonth() + parseInt(months, 10));
+  return d.toISOString().split('T')[0];
+}
+
+function addYears(isoDate, years) {
+  if (!isoDate || !years) return null;
+  const d = new Date(isoDate + 'T12:00:00');
+  d.setFullYear(d.getFullYear() + parseInt(years, 10));
+  return d.toISOString().split('T')[0];
+}
+
+// Returns number of days from today to isoDate (negative = past)
+function daysFrom(isoDate) {
+  if (!isoDate) return null;
+  const t = new Date(today() + 'T12:00:00');
+  const d = new Date(isoDate + 'T12:00:00');
+  return Math.round((d - t) / 86400000);
+}
+
+// Returns decimal years from isoDate to today (positive = past)
+function ageYears(isoDate) {
+  if (!isoDate) return null;
+  const t = new Date(today() + 'T12:00:00');
+  const d = new Date(isoDate + 'T12:00:00');
+  return (t - d) / (86400000 * 365.25);
+}
+
+function getNextDue(item) {
+  return addMonths(item.last_serviced_date, item.service_interval_months);
+}
+
+function getEOL(item) {
+  return addYears(item.install_date, item.expected_lifespan_years);
+}
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// ── AUTH ─────────────────────────────────────────────────────────────────────
+async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) {
+    S.user = session.user;
+    await bootApp();
+  } else {
+    showLogin();
+  }
+}
+
+function showLogin() {
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+}
+
+async function bootApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  await loadAll();
+  renderView();
+}
+
+document.getElementById('btn-login').addEventListener('click', async () => {
+  const email = document.getElementById('le').value.trim();
+  const pw = document.getElementById('lp').value;
+  const errEl = document.getElementById('lerr');
+  const btn = document.getElementById('btn-login');
+  errEl.style.display = 'none';
+  btn.disabled = true;
+  btn.textContent = 'Signing in…';
+  const { data, error } = await sb.auth.signInWithPassword({ email, password: pw });
+  if (error) {
+    errEl.textContent = error.message;
+    errEl.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'Sign In';
+  } else {
+    S.user = data.user;
+    await bootApp();
+  }
+});
+
+['le', 'lp'].forEach(id => {
+  document.getElementById(id).addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('btn-login').click();
+  });
+});
+
+document.getElementById('btn-logout').addEventListener('click', async () => {
+  await sb.auth.signOut();
+  S.user = null; S.inventory = []; S.log = [];
+  showLogin();
+});
+
+// ── DATA ─────────────────────────────────────────────────────────────────────
+async function loadAll() {
+  const [invRes, logRes] = await Promise.all([
+    sb.from('inventory').select('*').order('category').order('name'),
+    sb.from('maintenance_log').select('*').order('date', { ascending: false }).order('created_at', { ascending: false }),
+  ]);
+  if (!invRes.error) S.inventory = invRes.data || [];
+  if (!logRes.error) S.log = logRes.data || [];
+}
+
+// ── NAVIGATION ───────────────────────────────────────────────────────────────
+document.querySelectorAll('nav button').forEach(btn => {
+  btn.addEventListener('click', () => goTo(btn.dataset.view));
+});
+
+function goTo(view) {
+  S.view = view;
+  S.invView = 'list';
+  S.selItem = null;
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+  renderView();
+}
+
+function renderView() {
+  ['dashboard', 'inventory', 'log'].forEach(v => {
+    document.getElementById('view-' + v).style.display = v === S.view ? '' : 'none';
+  });
+  if (S.view === 'dashboard') renderDashboard();
+  else if (S.view === 'inventory') renderInventory();
+  else renderLog();
+}
+
+// ── DASHBOARD ────────────────────────────────────────────────────────────────
+function renderDashboard() {
+  const el = document.getElementById('view-dashboard');
+
+  // Overdue / Due Soon: items with a service interval where next_due <= today+60
+  const dueSoon = S.inventory.filter(item => {
+    const next = getNextDue(item);
+    if (!next) return false;
+    const diff = daysFrom(next);
+    return diff !== null && diff <= 60;
+  }).sort((a, b) => daysFrom(getNextDue(a)) - daysFrom(getNextDue(b)));
+
+  // Aging: items where EOL is within 3 years (past or future)
+  const aging = S.inventory.filter(item => {
+    const eol = getEOL(item);
+    if (!eol) return false;
+    return daysFrom(eol) <= 3 * 365;
+  }).sort((a, b) => daysFrom(getEOL(a)) - daysFrom(getEOL(b)));
+
+  let html = '';
+
+  html += `<div class="sh"><h2>Overdue &amp; Due Soon</h2></div>`;
+  if (dueSoon.length === 0) {
+    html += `<div class="card"><div class="empty">No items overdue or due within 60 days. &#10003;</div></div>`;
+  } else {
+    dueSoon.forEach(item => {
+      const next = getNextDue(item);
+      const diff = daysFrom(next);
+      const isOver = diff < 0;
+      const cls = isOver ? 'overdue' : 'due-soon';
+      const label = isOver
+        ? `Overdue ${Math.abs(diff)}d`
+        : diff === 0 ? 'Due today' : `Due in ${diff}d`;
+      const badgeCls = isOver ? 'badge-overdue' : 'badge-soon';
+      html += `<div class="alert ${cls}" onclick="openDetail('${esc(item.id)}')">
+        <div class="alert-row">
+          <h3>${esc(item.name)}</h3>
+          <span class="badge ${badgeCls}">${label}</span>
+        </div>
+        <p>${esc(item.category)} &middot; Last serviced: ${fmtDate(item.last_serviced_date)} &middot; Next due: ${fmtDate(next)}</p>
+      </div>`;
+    });
+  }
+
+  html += `<hr class="divider">`;
+  html += `<div class="sh"><h2>Aging Systems</h2></div>`;
+  if (aging.length === 0) {
+    html += `<div class="card"><div class="empty">No systems approaching end of life within 3 years. &#10003;</div></div>`;
+  } else {
+    aging.forEach(item => {
+      const eol = getEOL(item);
+      const diff = daysFrom(eol);
+      const isPast = diff < 0;
+      const cls = isPast ? 'eol-past' : 'eol-near';
+      const yrs = Math.abs(diff / 365.25).toFixed(1);
+      const label = isPast ? `${yrs}y past EOL` : `EOL in ${yrs}y`;
+      const badgeCls = isPast ? 'badge-overdue' : 'badge-soon';
+      html += `<div class="alert ${cls}" onclick="openDetail('${esc(item.id)}')">
+        <div class="alert-row">
+          <h3>${esc(item.name)}</h3>
+          <span class="badge ${badgeCls}">${label}</span>
+        </div>
+        <p>${esc(item.category)} &middot; Installed: ${fmtDate(item.install_date)} &middot; Lifespan: ${item.expected_lifespan_years}y &middot; EOL: ${fmtDate(eol)}</p>
+      </div>`;
+    });
+  }
+
+  el.innerHTML = html;
+}
+
+// ── INVENTORY LIST ────────────────────────────────────────────────────────────
+function renderInventory() {
+  const el = document.getElementById('view-inventory');
+
+  if (S.invView === 'detail' && S.selItem) {
+    renderDetail(el);
+    return;
+  }
+
+  const groups = {};
+  S.inventory.forEach(item => {
+    (groups[item.category] = groups[item.category] || []).push(item);
+  });
+
+  let html = `<div class="sh"><h2>Inventory</h2>
+    <button class="btn btn-primary btn-sm" onclick="showAddInvForm()">+ Add Item</button>
+  </div>`;
+
+  if (S.inventory.length === 0) {
+    html += `<div class="empty">No inventory items yet.</div>`;
+  } else {
+    Object.keys(groups).sort().forEach(cat => {
+      html += `<div class="cat-group"><div class="cat-label">${esc(cat)}</div>`;
+      groups[cat].forEach(item => {
+        const next = getNextDue(item);
+        const diff = next ? daysFrom(next) : null;
+        const over = diff !== null && diff < 0;
+        const soon = diff !== null && diff >= 0 && diff <= 60;
+        const rowCls = over ? 'overdue' : soon ? 'due-soon' : '';
+        const makeModel = [item.make, item.model].filter(Boolean).map(esc).join(' ');
+        const age = item.install_date ? `${Math.floor(ageYears(item.install_date))}y old` : '';
+        const meta = [makeModel, age].filter(Boolean).join(' &middot; ') || '&mdash;';
+        let rightHtml = '';
+        if (next) {
+          const color = over ? 'var(--danger)' : soon ? 'var(--warn-text)' : 'var(--muted)';
+          const label = over ? 'Overdue' : soon ? `Due in ${diff}d` : `Due ${fmtDate(next)}`;
+          rightHtml = `<div class="inv-meta" style="color:${color}">${label}</div>`;
+        }
+        html += `<div class="inv-row ${rowCls}" onclick="openDetail('${esc(item.id)}')">
+          <div>
+            <div class="inv-name">${esc(item.name)}</div>
+            <div class="inv-meta">${meta}</div>
+          </div>
+          <div class="inv-right">${rightHtml}</div>
+        </div>`;
+      });
+      html += `</div>`;
+    });
+  }
+
+  el.innerHTML = html;
+}
+
+function openDetail(id) {
+  const item = S.inventory.find(i => i.id === id);
+  if (!item) return;
+  S.selItem = item;
+  S.invView = 'detail';
+  if (S.view !== 'inventory') {
+    S.view = 'inventory';
+    document.querySelectorAll('nav button').forEach(b => b.classList.toggle('active', b.dataset.view === 'inventory'));
+    ['dashboard', 'inventory', 'log'].forEach(v => {
+      document.getElementById('view-' + v).style.display = v === 'inventory' ? '' : 'none';
+    });
+  }
+  renderInventory();
+}
+
+function backToList() {
+  S.invView = 'list';
+  S.selItem = null;
+  renderInventory();
+}
+
+// ── INVENTORY DETAIL ──────────────────────────────────────────────────────────
+function renderDetail(el) {
+  const item = S.selItem;
+  const next = getNextDue(item);
+  const eol = getEOL(item);
+  const age = item.install_date ? ageYears(item.install_date).toFixed(1) : null;
+  const linked = S.log.filter(e => e.inventory_id === item.id);
+
+  const catOpts = ['HVAC','Plumbing','Electrical','Roofing','Smart Home','Structure','Fireplace','Irrigation']
+    .map(c => `<option value="${esc(c)}">`).join('');
+
+  let html = `<div class="detail-header">
+    <button class="btn btn-ghost btn-sm" onclick="backToList()">&larr; Back</button>
+    <h2>${esc(item.name)}</h2>
+    <button class="btn btn-danger btn-sm" onclick="deleteInvItem('${esc(item.id)}')">Delete</button>
+  </div>
+  <div class="card">
+    <div class="sh" style="margin-bottom:0.85rem"><h2 style="font-size:0.875rem">Details</h2></div>
+    <datalist id="det-cats">${catOpts}</datalist>
+    <div class="fgrid">
+      <div class="fg req"><label>Name</label><input type="text" id="det-name" value="${esc(item.name)}"></div>
+      <div class="fg req"><label>Category</label><input type="text" id="det-cat" value="${esc(item.category)}" list="det-cats"></div>
+      <div class="fg"><label>Make</label><input type="text" id="det-make" value="${esc(item.make || '')}"></div>
+      <div class="fg"><label>Model</label><input type="text" id="det-model" value="${esc(item.model || '')}"></div>
+      <div class="fg"><label>Serial Number</label><input type="text" id="det-serial" value="${esc(item.serial || '')}"></div>
+      <div class="fg"><label>Install Date</label><input type="date" id="det-install" value="${item.install_date || ''}"></div>
+      <div class="fg"><label>Expected Lifespan (years)</label><input type="number" id="det-life" value="${item.expected_lifespan_years || ''}" min="1"></div>
+      <div class="fg"><label>Service Interval (months)</label><input type="number" id="det-interval" value="${item.service_interval_months || ''}" min="1"></div>
+      <div class="fg"><label>Last Serviced Date</label><input type="date" id="det-serviced" value="${item.last_serviced_date || ''}"></div>
+    </div>
+    <div class="fg"><label>Notes</label><textarea id="det-notes">${esc(item.notes || '')}</textarea></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;margin-top:0.25rem">
+      <div class="detail-meta">
+        ${age !== null ? `Age: ${age} years` : ''}${age !== null && (next || eol) ? ' &middot; ' : ''}${next ? `Next due: ${fmtDate(next)}` : ''}${next && eol ? ' &middot; ' : ''}${eol ? `EOL: ${fmtDate(eol)}` : ''}
+      </div>
+      <button class="btn btn-primary" onclick="saveDetail('${esc(item.id)}')">Save Changes</button>
+    </div>
+  </div>
+  <hr class="divider">
+  <div class="sh">
+    <h2>Maintenance History</h2>
+    <button class="btn btn-primary btn-sm" onclick="showAddLogForm('${esc(item.id)}')">+ Add Entry</button>
+  </div>`;
+
+  if (linked.length === 0) {
+    html += `<div class="empty">No maintenance history for this item.</div>`;
+  } else {
+    linked.forEach(entry => {
+      html += `<div class="log-row" onclick="showEditLogForm('${esc(entry.id)}')">
+        <div class="log-top">
+          <span class="log-date">${fmtDateLong(entry.date)}</span>
+          <span class="log-cost">${fmtMoney(entry.cost)}</span>
+        </div>
+        <div class="log-desc">${esc(entry.description)}</div>
+        <div class="log-meta">${entry.contractor ? esc(entry.contractor) : '&mdash;'}${entry.notes ? ' &middot; ' + esc(entry.notes) : ''}</div>
+      </div>`;
+    });
+  }
+
+  el.innerHTML = html;
+}
+
+async function saveDetail(id) {
+  const name = document.getElementById('det-name').value.trim();
+  const category = document.getElementById('det-cat').value.trim();
+  if (!name || !category) { toast('Name and Category are required.'); return; }
+
+  const patch = {
+    name,
+    category,
+    make: document.getElementById('det-make').value.trim() || null,
+    model: document.getElementById('det-model').value.trim() || null,
+    serial: document.getElementById('det-serial').value.trim() || null,
+    install_date: document.getElementById('det-install').value || null,
+    expected_lifespan_years: document.getElementById('det-life').value ? parseInt(document.getElementById('det-life').value, 10) : null,
+    service_interval_months: document.getElementById('det-interval').value ? parseInt(document.getElementById('det-interval').value, 10) : null,
+    last_serviced_date: document.getElementById('det-serviced').value || null,
+    notes: document.getElementById('det-notes').value.trim() || null,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { error } = await sb.from('inventory').update(patch).eq('id', id);
+  if (error) { toast('Error: ' + error.message); return; }
+  await loadAll();
+  S.selItem = S.inventory.find(i => i.id === id);
+  toast('Saved.');
+  renderInventory();
+}
+
+async function deleteInvItem(id) {
+  const item = S.inventory.find(i => i.id === id);
+  if (!confirm(`Delete "${item?.name}"? This cannot be undone.`)) return;
+  const { error } = await sb.from('inventory').delete().eq('id', id);
+  if (error) { toast('Error: ' + error.message); return; }
+  await loadAll();
+  toast('Item deleted.');
+  backToList();
+}
+
+// ── ADD INVENTORY MODAL ───────────────────────────────────────────────────────
+function showAddInvForm() {
+  document.getElementById('modal-title').textContent = 'Add Inventory Item';
+  document.getElementById('modal-body').innerHTML = invFormHTML({});
+  document.getElementById('modal-foot').innerHTML = `
+    <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+    <button class="btn btn-primary" onclick="submitAddInv()">Add Item</button>`;
+  openModal();
+}
+
+function invFormHTML(item) {
+  const catOpts = ['HVAC','Plumbing','Electrical','Roofing','Smart Home','Structure','Fireplace','Irrigation']
+    .map(c => `<option value="${esc(c)}">`).join('');
+  return `<datalist id="f-cats">${catOpts}</datalist>
+  <div class="fgrid">
+    <div class="fg req"><label>Name</label><input type="text" id="f-name" value="${esc(item.name || '')}"></div>
+    <div class="fg req"><label>Category</label><input type="text" id="f-cat" value="${esc(item.category || '')}" list="f-cats"></div>
+    <div class="fg"><label>Make</label><input type="text" id="f-make" value="${esc(item.make || '')}"></div>
+    <div class="fg"><label>Model</label><input type="text" id="f-model" value="${esc(item.model || '')}"></div>
+    <div class="fg"><label>Serial Number</label><input type="text" id="f-serial" value="${esc(item.serial || '')}"></div>
+    <div class="fg"><label>Install Date</label><input type="date" id="f-install" value="${item.install_date || ''}"></div>
+    <div class="fg"><label>Expected Lifespan (years)</label><input type="number" id="f-life" value="${item.expected_lifespan_years || ''}" min="1"></div>
+    <div class="fg"><label>Service Interval (months)</label><input type="number" id="f-interval" value="${item.service_interval_months || ''}" min="1"></div>
+    <div class="fg"><label>Last Serviced Date</label><input type="date" id="f-serviced" value="${item.last_serviced_date || ''}"></div>
+  </div>
+  <div class="fg"><label>Notes</label><textarea id="f-notes">${esc(item.notes || '')}</textarea></div>`;
+}
+
+async function submitAddInv() {
+  const name = document.getElementById('f-name').value.trim();
+  const category = document.getElementById('f-cat').value.trim();
+  if (!name || !category) { toast('Name and Category are required.'); return; }
+
+  const row = {
+    name, category,
+    make: document.getElementById('f-make').value.trim() || null,
+    model: document.getElementById('f-model').value.trim() || null,
+    serial: document.getElementById('f-serial').value.trim() || null,
+    install_date: document.getElementById('f-install').value || null,
+    expected_lifespan_years: document.getElementById('f-life').value ? parseInt(document.getElementById('f-life').value, 10) : null,
+    service_interval_months: document.getElementById('f-interval').value ? parseInt(document.getElementById('f-interval').value, 10) : null,
+    last_serviced_date: document.getElementById('f-serviced').value || null,
+    notes: document.getElementById('f-notes').value.trim() || null,
+  };
+
+  const { error } = await sb.from('inventory').insert(row);
+  if (error) { toast('Error: ' + error.message); return; }
+  await loadAll();
+  closeModal();
+  toast('Item added.');
+  renderInventory();
+}
+
+// ── MAINTENANCE LOG ───────────────────────────────────────────────────────────
+function renderLog() {
+  const el = document.getElementById('view-log');
+  const invMap = Object.fromEntries(S.inventory.map(i => [i.id, i.name]));
+
+  const filtered = S.logFilter
+    ? S.log.filter(e => e.inventory_id === S.logFilter)
+    : S.log;
+
+  const invOpts = S.inventory
+    .map(i => `<option value="${esc(i.id)}" ${S.logFilter === i.id ? 'selected' : ''}>${esc(i.name)} (${esc(i.category)})</option>`)
+    .join('');
+
+  let html = `<div class="sh"><h2>Maintenance Log</h2>
+    <button class="btn btn-primary btn-sm" onclick="showAddLogForm()">+ Add Entry</button>
+  </div>
+  <div class="filter-bar">
+    <label>Filter by item:</label>
+    <select onchange="setLogFilter(this.value)">
+      <option value="">All items</option>${invOpts}
+    </select>
+  </div>`;
+
+  if (filtered.length === 0) {
+    html += `<div class="empty">No maintenance log entries${S.logFilter ? ' for this item' : ' yet'}.</div>`;
+  } else {
+    filtered.forEach(entry => {
+      const inv = entry.inventory_id ? (invMap[entry.inventory_id] || '—') : '—';
+      html += `<div class="log-row" onclick="showEditLogForm('${esc(entry.id)}')">
+        <div class="log-top">
+          <span class="log-date">${fmtDateLong(entry.date)}</span>
+          <span class="log-cost">${fmtMoney(entry.cost)}</span>
+        </div>
+        <div class="log-desc">${esc(entry.description)}</div>
+        <div class="log-meta">${esc(inv)} &middot; ${entry.contractor ? esc(entry.contractor) : '&mdash;'}${entry.notes ? ' &middot; ' + esc(entry.notes) : ''}</div>
+      </div>`;
+    });
+  }
+
+  el.innerHTML = html;
+}
+
+function setLogFilter(val) {
+  S.logFilter = val || null;
+  renderLog();
+}
+
+// ── LOG FORM ──────────────────────────────────────────────────────────────────
+function logFormHTML(entry) {
+  const invOpts = S.inventory
+    .map(i => `<option value="${esc(i.id)}" ${entry.inventory_id === i.id ? 'selected' : ''}>${esc(i.name)} (${esc(i.category)})</option>`)
+    .join('');
+  return `<div class="fgrid">
+    <div class="fg req"><label>Date</label><input type="date" id="lf-date" value="${entry.date || today()}"></div>
+    <div class="fg"><label>Linked Item (optional)</label>
+      <select id="lf-inv">
+        <option value="">&#8212; None (freestanding) &#8212;</option>${invOpts}
+      </select>
+    </div>
+    <div class="fg"><label>Contractor</label><input type="text" id="lf-cont" value="${esc(entry.contractor || '')}" placeholder="Name or DIY"></div>
+    <div class="fg"><label>Cost (USD)</label><input type="number" id="lf-cost" value="${entry.cost != null ? entry.cost : ''}" min="0" step="0.01" placeholder="0.00"></div>
+  </div>
+  <div class="fg req"><label>Description</label><textarea id="lf-desc">${esc(entry.description || '')}</textarea></div>
+  <div class="fg"><label>Notes</label><textarea id="lf-notes" style="min-height:56px">${esc(entry.notes || '')}</textarea></div>`;
+}
+
+function getLogData() {
+  const date = document.getElementById('lf-date').value;
+  const description = document.getElementById('lf-desc').value.trim();
+  if (!date || !description) { toast('Date and Description are required.'); return null; }
+  return {
+    date,
+    description,
+    contractor: document.getElementById('lf-cont').value.trim() || null,
+    cost: document.getElementById('lf-cost').value !== '' ? parseFloat(document.getElementById('lf-cost').value) : null,
+    notes: document.getElementById('lf-notes').value.trim() || null,
+    inventory_id: document.getElementById('lf-inv').value || null,
+  };
+}
+
+function showAddLogForm(inventoryId) {
+  document.getElementById('modal-title').textContent = 'Add Maintenance Entry';
+  document.getElementById('modal-body').innerHTML = logFormHTML({ inventory_id: inventoryId || null });
+  document.getElementById('modal-foot').innerHTML = `
+    <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+    <button class="btn btn-primary" onclick="submitAddLog()">Add Entry</button>`;
+  openModal();
+}
+
+function showEditLogForm(id) {
+  const entry = S.log.find(e => e.id === id);
+  if (!entry) return;
+  document.getElementById('modal-title').textContent = 'Edit Maintenance Entry';
+  document.getElementById('modal-body').innerHTML = logFormHTML(entry);
+  document.getElementById('modal-foot').innerHTML = `
+    <button class="btn btn-danger btn-sm" style="margin-right:auto" onclick="deleteLogEntry('${esc(id)}')">Delete</button>
+    <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+    <button class="btn btn-primary" onclick="submitEditLog('${esc(id)}')">Save Changes</button>`;
+  openModal();
+}
+
+async function submitAddLog() {
+  const data = getLogData();
+  if (!data) return;
+
+  const wasInDetail = S.invView === 'detail';
+  const { error } = await sb.from('maintenance_log').insert(data);
+  if (error) { toast('Error: ' + error.message); return; }
+
+  closeModal();
+
+  if (data.inventory_id) {
+    await maybeUpdateServiced(data.inventory_id, data.date);
+  }
+
+  await loadAll();
+  // Refresh selected item if we're in detail view
+  if (wasInDetail && S.selItem) {
+    S.selItem = S.inventory.find(i => i.id === S.selItem.id);
+  }
+  toast('Entry added.');
+  if (wasInDetail) renderInventory(); else renderLog();
+}
+
+async function submitEditLog(id) {
+  const data = getLogData();
+  if (!data) return;
+
+  const { error } = await sb.from('maintenance_log').update(data).eq('id', id);
+  if (error) { toast('Error: ' + error.message); return; }
+
+  closeModal();
+  await loadAll();
+  if (S.invView === 'detail' && S.selItem) {
+    S.selItem = S.inventory.find(i => i.id === S.selItem.id);
+  }
+  toast('Entry updated.');
+  if (S.invView === 'detail') renderInventory(); else renderLog();
+}
+
+async function deleteLogEntry(id) {
+  if (!confirm('Delete this maintenance entry? This cannot be undone.')) return;
+  const { error } = await sb.from('maintenance_log').delete().eq('id', id);
+  if (error) { toast('Error: ' + error.message); return; }
+  closeModal();
+  await loadAll();
+  if (S.invView === 'detail' && S.selItem) {
+    S.selItem = S.inventory.find(i => i.id === S.selItem.id);
+  }
+  toast('Entry deleted.');
+  if (S.invView === 'detail') renderInventory(); else renderLog();
+}
+
+async function maybeUpdateServiced(inventoryId, date) {
+  const item = S.inventory.find(i => i.id === inventoryId);
+  if (!item) return;
+  if (!confirm(`Update "Last Serviced" date on "${item.name}" to ${fmtDateLong(date)}?`)) return;
+  const { error } = await sb.from('inventory').update({ last_serviced_date: date, updated_at: new Date().toISOString() }).eq('id', inventoryId);
+  if (error) toast('Could not update last serviced date: ' + error.message);
+}
+
+// ── MODAL ────────────────────────────────────────────────────────────────────
+function openModal() {
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+}
+
+document.getElementById('modal-close').addEventListener('click', closeModal);
+document.getElementById('modal-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal-overlay')) closeModal();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeModal();
+});
+
+// ── BOOT ─────────────────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
